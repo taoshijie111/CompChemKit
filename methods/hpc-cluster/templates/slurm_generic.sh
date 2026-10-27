@@ -31,7 +31,7 @@ cd "$SLURM_SUBMIT_DIR" || exit 1
 echo "job=${SLURM_JOB_NAME} id=${SLURM_JOB_ID} node=$(hostname) start=$(date)"
 echo "cpus=${SLURM_CPUS_PER_TASK} cwd=$(pwd)"
 
-# optional: single-socket / NUMA sanity check (see platforms/ustc.md section 3.3)
+# optional: single-socket / NUMA sanity check (see platforms/precision.md section 3.3)
 # ids=$(scontrol show job "$SLURM_JOB_ID" -d | tr ' ' '\n' | sed -n 's/^CPU_IDs=//p')
 # echo "CPU_IDs=$ids"
 

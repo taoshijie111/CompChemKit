@@ -72,7 +72,7 @@ cp config/platforms.example.json ~/.compchemkit/config.json   # 然后编辑
 | `workdir` | | 远程项目根，示例命令里替换 |
 | `software.*` | | 可执行文件绝对路径；`hpc_config.py env` 会导出成 `$HPC_ORCA` 等 |
 | `env_setup` | | 一段 bash，粘到作业脚本开头（`module load` / `PATH`） |
-| `notes_file` | | 平台专属说明文件，相对 skill 目录，例如 `platforms/ustc.md` |
+| `notes_file` | | 平台专属说明文件，相对 skill 目录，例如 `platforms/precision.md` |
 
 ## 5. 自检
 
