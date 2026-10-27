@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# analyze_uind: run Tinker ``analyze`` in a way that writes an induced-dipole file.
+#
+# Tinker has no ``analyze_uind`` program: this wrapper
+#   1. locates the key file by convention ( <stem>.key, then system.key, then tinker.key ),
+#   2. appends SAVE-INDUCED if it is missing,
+#   3. runs ``analyze <coord> -k <key> E``.
+#
+# It is what makes ``analyze_uind ref.arc U`` usable: ref.arc has no box line and
+# ref.key has no Ewald/box settings, so the result is the gas-phase induced dipole
+# of the isolated probe at exactly the production coordinates.
+#
+# Set ANALYZE_CMD if the Tinker ``analyze`` binary is not on PATH.
+set -euo pipefail
+
+if [[ $# -lt 1 ]]; then
+  echo "Usage: analyze_uind coordinate.arc [U|analysis-options] [extra analyze args...]" >&2
+  exit 2
+fi
+
+coord="$1"
+shift
+
+analysis="${1:-E}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+
+analysis_upper="${analysis^^}"
+analysis_clean="${analysis_upper//U/}"
+if [[ -z "${analysis_clean}" ]]; then
+  analysis_clean="E"
+fi
+if [[ ! "${analysis_clean}" =~ [EAL] ]]; then
+  analysis_clean="E${analysis_clean}"
+fi
+
+ANALYZE_CMD="${ANALYZE_CMD:-analyze}"
+
+coord_dir="$(dirname -- "${coord}")"
+coord_name="$(basename -- "${coord}")"
+coord_stem="${coord_name%.*}"
+if [[ "${coord_dir}" == "." ]]; then
+  coord_dir="$(pwd)"
+fi
+
+source_key=""
+for candidate in \
+  "${coord_dir}/${coord_stem}.key" \
+  "${coord_dir}/system.key" \
+  "${coord_dir}/tinker.key"; do
+  if [[ -f "${candidate}" ]]; then
+    source_key="${candidate}"
+    break
+  fi
+done
+
+tmp_key="${coord_dir}/.analyze_uind_${coord_stem}_$$.key"
+if [[ -n "${source_key}" ]]; then
+  cp "${source_key}" "${tmp_key}"
+else
+  : > "${tmp_key}"
+fi
+
+if ! grep -Eiq '^[[:space:]]*SAVE[-_]INDUCED([[:space:]]|$)' "${tmp_key}"; then
+  printf '\nSAVE-INDUCED\n' >> "${tmp_key}"
+fi
+
+cleanup() {
+  rm -f "${tmp_key}"
+}
+trap cleanup EXIT
+
+"${ANALYZE_CMD}" "${coord}" -k "${tmp_key}" "${analysis_clean}" "$@"

@@ -1,0 +1,61 @@
+{
+  "_comment": [
+    "TEMPLATE ONLY - copy to ~/.compchemkit/config.json and fill in your own values.",
+    "On Windows: %USERPROFILE%\\.compchemkit\\config.json",
+    "This file is NEVER committed: it contains your account and cluster addresses.",
+    "Create/update entries with:",
+    "  python scripts/hpc_config.py init --platform mycluster --host hpc.example.edu --user your_username",
+    "Validate with:            python scripts/hpc_config.py check",
+    "Print it (secrets masked): python scripts/hpc_config.py show"
+  ],
+  "default_platform": "mycluster",
+  "platforms": {
+    "mycluster": {
+      "host": "hpc.example.edu",
+      "port": 22,
+      "user": "your_username",
+      "ssh_alias": "hpc",
+      "auth": {
+        "method": "key",
+        "key_path": "~/.ssh/id_ed25519",
+        "password_env": "HPC_PASS"
+      },
+      "scheduler": {
+        "type": "slurm",
+        "partition": "cpu192",
+        "qos_default": "regular",
+        "qos_fast": "premium",
+        "qos_debug": "debug",
+        "cores_per_node": 192
+      },
+      "workdir": "/path/to/your/project",
+      "software": {
+        "orca": "/path/to/orca/orca",
+        "xtb": "/path/to/xtb/bin/xtb",
+        "multiwfn": "/path/to/Multiwfn_noGUI",
+        "python": "/path/to/python3"
+      },
+      "env_setup": "export PATH=/path/to/openmpi/bin:$PATH\nexport LD_LIBRARY_PATH=/path/to/openmpi/lib:$LD_LIBRARY_PATH",
+      "notes_file": "platforms/mycluster.md"
+    },
+    "second-cluster": {
+      "host": "login.other-cluster.org",
+      "port": 2222,
+      "user": "your_username",
+      "ssh_alias": "other",
+      "auth": { "method": "password", "password_env": "OTHER_PASS" },
+      "scheduler": {
+        "type": "slurm",
+        "partition": "normal",
+        "qos_default": "normal",
+        "qos_fast": "high",
+        "qos_debug": "debug",
+        "cores_per_node": 64
+      },
+      "workdir": "/home/your_username/project",
+      "software": { "orca": "/opt/orca/orca", "xtb": "/opt/xtb/bin/xtb" },
+      "env_setup": "module load openmpi/4.1.5",
+      "notes_file": "platforms/other-cluster.md"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+name	sdf	smiles	density_g_ml	molar_mass_g_mol	num_solvent
+hexane	hexane.sdf	CCCCCC	0.6606	86.178	-
+thf	thf.sdf	C1CCOC1	0.8876	72.107	-
+dichloromethane	dichloromethane.sdf	ClCCl	1.3266	84.933	-
+chloroform	chloroform.sdf	ClC(Cl)Cl	1.489	119.378	-
+toluene	toluene.sdf	Cc1ccccc1	0.8669	92.141	-
+acetonitrile	acetonitrile.sdf	CC#N	0.786	41.053	-
+dmso	dmso.sdf	CS(=O)C	1.095	78.133	-

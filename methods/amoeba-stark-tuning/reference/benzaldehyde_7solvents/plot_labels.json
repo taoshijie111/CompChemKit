@@ -1,0 +1,9 @@
+{
+  "acetonitrile":   {"label": "MeCN",   "offset": [0, 9],  "ha": "center"},
+  "chloroform":     {"label": "CHCl$_3$", "offset": [3, -9], "ha": "left"},
+  "dichloromethane":{"label": "CH$_2$Cl$_2$", "offset": [-2, 8], "ha": "left"},
+  "dmso":           {"label": "DMSO",   "offset": [4, -1], "ha": "left"},
+  "hexane":         {"label": "Hexane", "offset": [-6, 3], "ha": "right"},
+  "thf":            {"label": "THF",    "offset": [1, 8],  "ha": "left"},
+  "toluene":        {"label": "Toluene","offset": [1, -8], "ha": "left"}
+}

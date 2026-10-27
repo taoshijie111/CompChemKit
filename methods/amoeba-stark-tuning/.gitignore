@@ -1,0 +1,14 @@
+# per-study configuration and run output
+config/system_config.sh
+runs/
+analysis/
+run_logs/
+
+# python
+__pycache__/
+*.py[cod]
+
+# editors / OS
+.DS_Store
+.vscode/
+*.swp

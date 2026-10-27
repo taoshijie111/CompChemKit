@@ -1,0 +1,8 @@
+! r2SCAN-3c Opt TightOpt VeryTightSCF DEFGRID3 SMD(Water)
+%pal nprocs 32
+  end
+%maxcore 4000
+%geom
+  MaxIter 300
+end
+* xyzfile 0 1 start.xyz

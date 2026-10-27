@@ -1,0 +1,23 @@
+# Keep the working tree and the repository LF everywhere: these skills are full of
+# shell / Slurm / PowerShell scripts that break on CRLF (see methods/hpc-cluster/SKILL.md §2.3).
+* text=auto eol=lf
+
+# Scripts and code: always LF, never converted on checkout.
+*.sh    text eol=lf
+*.ps1   text eol=lf
+*.py    text eol=lf
+*.slurm text eol=lf
+*.inp   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.csv   text eol=lf
+*.tsv   text eol=lf
+
+# Binaries: never touch them.
+*.png  binary
+*.jpg  binary
+*.pdf  binary
+*.h5   binary
+*.gz   binary
+*.pkl  binary
+*.zip  binary

@@ -1,0 +1,22 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ---- 已有数据：输入/输出数据集不入库 ----
+# 输入 SMILES 分片
+data/
+
+# 中间/输出数据（XYZ 构象、xtb 结果、光谱数据库）
+xyz_out/
+*.h5
+error.log
+
+# 脚本默认输出目录（运行时会重新生成）
+xyz/
+xyz_output/
+
+# ---- 编辑器/系统 ----
+.vscode/
+.idea/
+.DS_Store

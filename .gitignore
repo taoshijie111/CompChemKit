@@ -1,0 +1,23 @@
+# ---- Python ----
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# ---- OS junk ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- editors ----
+.vscode/
+.idea/
+
+# ---- local config and secrets ----
+config.local.*
+*.local.json
+.env
+*.key
+*.pem
+
+# ---- logs ----
+*.log

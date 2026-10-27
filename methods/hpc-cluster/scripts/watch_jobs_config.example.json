@@ -1,0 +1,26 @@
+{
+  "_comment": [
+    "Template for the per-batch watchdog config. Copy it into your project, e.g.",
+    "  E:/projects/<project>/watch/watch_jobs.json, and edit the pieces below.",
+    "The watchdog itself lives in the hpc-cluster skill: scripts/watch_jobs.ps1",
+    "",
+    "Either put host_alias / remote_user here, or leave them out and let the",
+    "watchdog read them from ~/.compchemkit/config.json (optionally with -Platform).",
+    "Nothing in this file is secret: it only says WHICH cluster alias to ssh to.",
+    "",
+    "status_command is executed on the cluster via ssh and its output is pasted into",
+    "the final report - use it to print a per-system progress table."
+  ],
+  "host_alias": "hpc",
+  "remote_user": "your_username",
+  "patterns": [
+    "^(O|F)_(my_system)_"
+  ],
+  "poll_seconds": 600,
+  "max_hours": 72,
+  "status_command": "cd /path/to/project/jobs && for d in */; do n=${d%/}; o=$(grep -c 'THE OPTIMIZATION HAS CONVERGED' $n/opt.out 2>/dev/null || echo 0); printf '%-30s converged=%s\\n' $n $o; done",
+  "notes": [
+    "patterns match the Slurm JOB NAME (squeue %j), not the job id",
+    "poll_seconds 300-900 is a good range: too small hammers the login node for nothing"
+  ]
+}
