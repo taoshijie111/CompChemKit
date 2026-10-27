@@ -290,7 +290,7 @@ ORCA / xTB 的**关键词**属于方法层（见 `methods/` 下其它 skill）�
 | 文件 | 内容 |
 |---|---|
 | `platforms/_TEMPLATE.md` | 新平台的写法模板 |
-| `platforms/ustc.md` | 中科大 CPU 集群：QOS 表、`--mem` 不可用、`PrivateData=jobs`、spool 坑、隐式 OOM、NUMA/单 socket、实测基准 |
+| `platforms/ustc.md` | 精准 CPU 集群：QOS 表、`--mem` 不可用、`PrivateData=jobs`、spool 坑、隐式 OOM、NUMA/单 socket、实测基准 |
 
 **规则**
 
@@ -347,7 +347,7 @@ scripts/watch_jobs.ps1          本地看门狗（只通知不决策）
 scripts/watch_jobs_config.example.json  看门狗配置模板
 scripts/watch_queue.sh          服务器端：等队列空再打印（无人通知）
 platforms/_TEMPLATE.md          新平台说明的模板
-platforms/ustc.md               中科大集群的专属说明
+platforms/ustc.md               精准集群的专属说明
 templates/slurm_generic.sh      通用 Slurm 作业模板
 templates/slurm_orca_optfreq.sh ORCA Opt→Freq 串接模板
 templates/slurm_xtb_ohess.sh    xTB 优化+频率模板
