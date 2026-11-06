@@ -72,3 +72,101 @@ per-element spectra on their own energy axes.
 If a wrapper script sources a site-specific login profile or module system before running FEFF,
 `set -u` can abort it on the first undefined variable inside that profile, often with no visible
 error. Use `set -e` (and `set -o pipefail` where available) without `-u` in such wrappers.
+
+## 9. A truncated cluster and a full `POTENTIALS` table do not mix
+
+Symptom: `pot` stops with
+
+```
+FMS for a cluster of   29 atoms around atom type   0
+ Cannot find all representative atoms
+ Increase FMS radius and rerun.
+ In subroutine FMS
+```
+
+then the next module fails with something unrelated — typically `screen` (or `xsph`) exiting `rc=2`
+because `pot.bin` was never written:
+
+```
+At line 108 of file rdpot.f90 (unit = 3)
+Fortran runtime error: Cannot open file 'pot.bin': No such file or directory
+```
+
+Cause: FEFF builds one potential per entry in `POTENTIALS`, and **every potential must have at least
+one representative atom inside the FMS sphere**. If you crop the cluster to a radius but keep
+listing every element of the whole molecule in `POTENTIALS`, any element that only exists outside
+the sphere has no representative atom and FEFF refuses to continue.
+
+This never shows up on small test molecules (the whole molecule fits inside the sphere, so every
+element is present) and appears only once structures are larger than the cluster radius — the
+normal case for a real dataset. In one 1.11 M-site batch it affected **16.6 % of all sites**.
+
+Defence: crop first, then number the potentials from what survived.
+
+```python
+dist = np.linalg.norm(xyz - xyz[idx], axis=1)
+kept = [i for i in range(len(elements)) if dist[i] <= r - 1e-6]
+order = [idx] + [i for i in kept if i != idx]
+others = list(dict.fromkeys(elements[i] for i in order[1:]))
+pot = {e: i + 1 for i, e in enumerate(others)}
+# ... and write only `order` to ATOMS
+```
+
+The absorber's own element still needs its own potential if it also appears among the other atoms
+(potential 0 carries the core hole), which the `dict.fromkeys` over `order[1:]` gives you for free.
+Atoms outside the sphere are unused by `SCF`/`FMS` anyway, so this is a no-op physically: on sites
+whose sphere already contained every element, the spectrum is bit-identical before and after the
+change (measured: max |Δμ| = 0 over the whole window).
+
+## 10. A module can STOP and still exit 0
+
+Fortran `STOP` under gfortran terminates the process with status 0. So a module that refuses to run
+(pitfall 9, and probably other guard clauses) looks like success to any launcher that only checks
+`returncode`. The failure then surfaces one or two modules later, in a module that has nothing to do
+with the real problem.
+
+Defence: check the content of each module's stderr as well as its return code.
+
+```python
+if rc != 0:
+    return failure(f"{m}: rc={rc}")
+err_text = (workdir / f"{m}.err").read_text(errors="replace")
+if any(line.strip() == "STOP" for line in err_text.splitlines()):
+    return failure(f"{m}: STOP in stderr (rc=0)")
+```
+
+A lone `STOP` line is specific enough not to collide with the harmless warnings FEFF writes
+(`IEEE_DIVIDE_BY_ZERO`, muffin-tin notes, SCF iteration lines).
+
+## 11. Validate a cross-section of the batch, not a single job
+
+A one-site smoke test proves the launcher works; it does not prove the batch will produce data.
+The expensive failures are silent: a run that "completes" every job in milliseconds while writing
+all-NaN spectra, and an aggregation step that reports `n_molecules_ok = N` because it only counts
+files that exist.
+
+Minimum validation before submitting the full batch:
+
+- pick the **smallest**, the **median** and the **largest** structure, and run *all* their sites;
+- assert `site_ok.any()` per structure and that the stored μ is finite and non-zero;
+- print, per shard, both `sites_ok` and `sites_fail`, and make the runner exit non-zero when
+  `sites_ok == 0` — a shard that succeeded at nothing must not look like a finished shard;
+- re-run one structure after any change to the input generator and require the spectrum to be
+  unchanged where the change should be a no-op.
+
+A cross-section run of 2 molecules and 20 sites (about five minutes) is what caught pitfall 9 in the
+1.11 M-site batch; without it the batch would have produced a dataset missing one sixth of its sites,
+with file names and logs that all looked successful.
+
+## 12. Per-site artifacts do not scale to 10^6 sites
+
+The three-piece set is ~20 KB per site, which sounds harmless until the site count is large:
+10^6 sites is ~20 GB but **3 × 10^6 files**, and listing/backing up/synchronising a directory tree
+that size on networked storage is impractical (a `find` over 35 k directories already took 16 min in
+one case). Intermediates are worse — ~7 MB per site, delete them inside the worker.
+
+Defence: aggregate. Store the per-site spectra in one array per structure (or per shard) and keep the
+`feff.inp` / `xmu.dat` / `spectrum.csv` trio only for a deterministic sample (a few per mille of the
+structures). `feff.inp` is a pure function of (geometry, cards), and the cards plus the generator's
+version can be recorded alongside the data, so full reproducibility does not require keeping the
+files.

@@ -1,7 +1,7 @@
 ---
 name: hpc-cluster
 description: Use when running computational-chemistry jobs on an SSH HPC cluster — connecting and setting up passwordless SSH, choosing partition/QOS/core count, writing Slurm batch scripts that survive the cluster's quirks, submitting/monitoring/cancelling jobs, transferring files with checksum verification, or watching a long multi-stage batch from the local machine and getting woken when a job ends. Cluster addresses, accounts, scheduler names and software paths live in a LOCAL config file (~/.compchemkit/config.json), never in this repo: on first use the skill asks the user for them and writes them. Per-cluster gotchas live in platforms/<name>.md.
-whenToUse: 需要连接一台超算（SSH）做量化计算、上传下载数据、提交或监控 Slurm 作业、给几天级/多层级任务挂本地看门狗、或者遇到 CRLF 报错、脚本秒退且 .err 里是 /var/spool/slurm、--mem 不可用、作业长期 PD (Priority)、ORCA 读不了 xyz、mpirun not found、not enough slots、隐式 OOM（Slurm 说 COMPLETED 但频率没算完）等问题时。
+whenToUse: 需要连接一台超算（SSH）做量化计算、上传下载数据、提交或监控 Slurm 作业、给几天级/多层级任务挂本地看门狗、把一个几万到几百万个独立小计算的批量任务铺到集群上、或者遇到 CRLF 报错、脚本秒退且 .err 里是 /var/spool/slurm、--mem 不可用、作业长期 PD (Priority)、作业数组只跑起十几个任务、把核数降到 1 反而更慢、ORCA 读不了 xyz、mpirun not found、not enough slots、隐式 OOM（Slurm 说 COMPLETED 但频率没算完）等问题时。
 ---
 
 # 超算集群：连接、提交、监控、下载
@@ -154,6 +154,8 @@ $remote = ssh hpc "md5sum /path/to/project/x.xyz | cut -d' ' -f1"
 | `squeue` 看不到别人的作业 | `PrivateData=jobs` | 正常；判断空闲看 `sinfo`，别指望看到谁在跑 |
 | 32 核也要排很久 | 需要**同一节点上连续 32 个空闲核**，空闲核常被碎片化 | 先看每节点空闲数（`sinfo -N -o '%N %t %C'`）再定核数 |
 | 短作业秒起、长作业一直挂着 | 短作业能回填进空隙，长作业不能 | 要么缩短墙钟，要么升优先级 QOS |
+| 作业数组开得再大，同时也只有十几个在跑 | 回填器对**每个数组作业**有"预留任务数"上限（Slurm 默认 `bf_max_job_array_resv=20`），与空闲核数无关 | 按 §3.6 改投递形态：拆成多个小组数组，或干脆一单元一作业 |
+| 把每作业核数降到 1，反而更慢 | 并发上限常按**作业个数**计，不按核数计 | 真实吞吐 ≈ `min(空闲核, 每用户并发作业上限 × 每作业核数)`，见 §3.6 |
 | `scontrol show job 1,2,3` 报 `Invalid job id` | 它不接受逗号列表 | 批量查用 `sacct -j 1,2,3` |
 | 作业"成功"但输出没算完 | 见 §3.3 隐式 OOM | 永远不要只信 Slurm 的 `COMPLETED` |
 
@@ -220,6 +222,57 @@ ssh hpc "scancel <id>"
 
 模板：`templates/slurm_generic.sh`（通用）、`templates/slurm_orca_optfreq.sh`
 （Opt→Freq 串接，收敛才接着算）、`templates/slurm_xtb_ohess.sh`。
+
+### 3.6 大批量同构任务：先定投递形态，再谈单作业调优
+
+几万到几百万个**互相独立**的小计算（每个几分钟到几十分钟）时，单作业脚本写对了也未必跑得动。
+这类任务的成败几乎全在"投递形态"，而下面三条限制**与具体集群无关**，任何 Slurm 站点都会遇到：
+
+**① 作业数组 ≠ 并发。**
+回填调度器普遍对**每个数组作业**限制"预留任务数"（Slurm 默认参数 `bf_max_job_array_resv=20`）。
+所以数组开到 1000，同时能跑的往往只有十几个到二十个，**和空着多少核无关**。
+判据：数组里运行的任务数长期停在 15–20 附近、而 `sinfo` 显示大量空闲核 → 就是这个限制。
+
+**② 并发上限常按"作业个数"计，不按核数计。**
+每用户并发作业数通常是个硬上限（QOS 属性），核数只是"每作业要几个核"。
+于是真实吞吐是
+
+```
+可达核数 ≈ min(空闲核, 每用户并发作业上限 × 每作业核数)
+```
+
+把每作业核数从 8 降到 1，看起来更"省"，实际可能把可达核数砍掉 8 倍——**先查并发作业上限，再定每作业核数**。
+反过来说，当碎片化严重、大任务挤不进去时，降核数确实有效；两种情况的区别在于瓶颈是"连续空闲核"还是"作业个数"。
+
+**③ 回填只肯塞短作业。**
+长墙钟作业即使有空闲核也排不进——它会推迟更高优先级作业的预计开始时间。
+要求长墙钟之前，先做一次**墙钟阶梯探测**：同一份脚本，交一组 `1h / 4h / 8h / 12h / 24h` 的
+1 核小作业（作业体可以是 `sleep 20`），看哪一个开始排队。出现断崖的那个档位就是当前的可用墙钟上限。
+生产作业的墙钟取"断崖以下"，再用主动收尾（见下）保证不中途被杀。
+
+**推荐的投递形态（按重要性排序）**
+
+1. **最小独立单元 = 一个作业。** 一个结构 / 一帧 / 一个吸收位点就是天然单元：它本身短，
+   被杀或超时只损失一个单元，而且回填能塞进任意空隙。
+2. **自限流的补投器，而不是一次交满。** 用一个本地循环（或定时任务）维护
+   "运行 + 排队 ≤ N"，每轮只补缺口；N 取"并发作业上限"与"当前空闲核"的较小者。
+   这样既不会浪费队列槽位，也会随集群空闲情况自动伸缩。
+3. **去重靠可观测量，不靠状态文件。** 已完成 = 输出存在**且校验通过**；
+   在飞 = 调度器里自己的作业名带上单元标识（解析 `squeue -o "%j"`）。
+   两者都不需要额外记账，于是被 SIGKILL / 超时 / 手动取消的单元**下一轮自动重投**，
+   不需要任何清理逻辑。作业名因此要设计成"可反解出单元号"的形式。
+4. **主动收尾：`--max-seconds ≈ 0.7 × 墙钟`。** 在墙钟前自己退出，保证已完成的单元都已落盘，
+   下一轮靠续跑接上。**按"一个单元"检查时间预算**，按批检查会在收尾时多跑一个重单元然后被 SIGKILL。
+5. **先跑一个覆盖全链路的微小子集。** 不是"跑一个作业看它成不成"，而是"挑最小、最大、
+   各分支各一个，跑完整条管道并检查产物内容"。大批量任务里最贵的错误是**静默失败**：
+   作业 1 秒"成功"退出、产物全是空/NaN，而汇总脚本照样报"完成"。见 §3.3 同理。
+6. **产物形态要跟着规模变。** 单元数到 10^6 量级时，"每个单元 3 个文件"就是几百万个 inode，
+   在网络文件系统上会让列目录/备份/同步全部不可用。改成"聚合数组 + 抽样保留原始文件"：
+   全量数据进 HDF5/npz 之类的容器，另留千分之几的单元保留原始输入与中间产物用于校验。
+
+**反例（三个限制同时踩中）**：把 1000 个单元塞进一个数组、每个分片要 20 小时墙钟、
+每作业 1 核 —— 结果在上百个空闲核存在的情况下只跑起十几个任务，看似"集群没资源",
+实际是投递形态问题。
 
 ---
 

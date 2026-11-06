@@ -95,6 +95,32 @@ Read `references/pitfalls.md` before scaling up. The three that cost the most ti
 3. Fixed energy windows can start below the first energy FEFF actually computed. Shift the window
    or mark those points missing — never zero-fill, or every spectrum gets a fake leading edge.
 
+Two more that only appear once the clusters are truncated (i.e. when the molecule is bigger than the
+cluster radius — routine for large molecules, and invisible on small test systems):
+
+4. **Every potential must have a representative atom inside the FMS sphere.** If `ATOMS` is
+   truncated to a radius but the whole molecule's element list is still written to `POTENTIALS`,
+   `pot` prints `FMS ... Cannot find all representative atoms` and stops. Write only the retained
+   atoms and number the potentials from the retained elements.
+5. **Modules can stop and still exit 0** (Fortran `STOP` under gfortran). A `pot` failure this way
+   surfaces one module later as a confusing `screen`/`xsph` crash. Treat a lone `STOP` line in a
+   module's stderr as a failure.
+
+## Scaling out
+
+Sites are independent, so the batch shape matters more than any single-site tuning: one job per
+site (or per structure) with a short wall time and a self-regulating submitter beats one large,
+long job array by a wide margin. The general reasoning — why arrays do not equal concurrency, why
+the concurrency cap is counted in jobs rather than cores, and why backfill only takes short jobs —
+is in the sibling skill `methods/hpc-cluster` (§3.6). Two consequences specific to XAS batches:
+
+- The natural independent unit is the **(structure, absorbing atom)** pair, not the structure: a
+  molecule with 200 absorbers spread over one job turns it into a multi-hour unit that is expensive
+  to lose and hard to backfill.
+- At 10^6 sites the per-site three-piece set (`feff.inp`, `xmu.dat`, `spectrum.csv`) is millions of
+  files. Keep the spectra in aggregate arrays keyed by structure and retain the three-piece set for
+  a small sample only, so the inputs stay auditable without drowning networked storage.
+
 ## Files
 
 ```
