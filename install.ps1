@@ -3,8 +3,9 @@
     Install the CompChemKit skills into an agent's skills directory.
 
 .DESCRIPTION
-    Finds every methods/<skill>/ and knowledge/<skill>/ folder that contains a SKILL.md and
-    installs it into the destination skills directory (default: ~/.dsh/skills).
+    Finds every methods/<skill>/ folder that contains a SKILL.md, plus the knowledge/ knowledge
+    base (installed as one skill named by the `name:` field of knowledge/SKILL.md), and installs
+    each into the destination skills directory (default: ~/.dsh/skills).
 
     The default action is a copy, which is the robust choice. -Link tries a directory junction
     first (no administrator rights needed, unlike a symlink) and falls back to a copy with a
@@ -55,7 +56,8 @@ Usage: .\install.ps1 [-Dest <dir>] [-Link] [-Force]
   -Force        Allow replacing an existing skill directory (asks for confirmation)
   -?            Show this help
 
-Every methods/<skill>/ and knowledge/<skill>/ folder containing a SKILL.md is installed.
+Every methods/<skill>/ folder containing a SKILL.md is installed, plus the knowledge/ knowledge
+base as one skill (named by the `name:` field of knowledge/SKILL.md).
 '@
 }
 
@@ -70,19 +72,34 @@ if ([string]::IsNullOrEmpty($repoRoot)) {
 }
 
 # ---- discover skills -------------------------------------------------------
+# methods/<skill>/ is one skill per folder (folder name = skill name). knowledge/ is a single
+# knowledge-base skill: its folder name is fixed ("knowledge"), so its skill name comes from the
+# `name:` field of its SKILL.md.
 $skillDirs = @()
-foreach ($group in @('methods', 'knowledge')) {
-    $groupDir = Join-Path $repoRoot $group
-    if (-not (Test-Path -LiteralPath $groupDir -PathType Container)) { continue }
-    foreach ($dir in @(Get-ChildItem -LiteralPath $groupDir -Directory | Sort-Object Name)) {
+$methodsDir = Join-Path $repoRoot 'methods'
+if (Test-Path -LiteralPath $methodsDir -PathType Container) {
+    foreach ($dir in @(Get-ChildItem -LiteralPath $methodsDir -Directory | Sort-Object Name)) {
         if (Test-Path -LiteralPath (Join-Path $dir.FullName 'SKILL.md') -PathType Leaf) {
-            $skillDirs += $dir
+            $skillDirs += [pscustomobject]@{ Path = $dir.FullName; Name = $dir.Name }
         }
     }
 }
+$knowledgeDir = Join-Path $repoRoot 'knowledge'
+if (Test-Path -LiteralPath (Join-Path $knowledgeDir 'SKILL.md') -PathType Leaf) {
+    $name = ''
+    foreach ($line in Get-Content -LiteralPath (Join-Path $knowledgeDir 'SKILL.md') -Encoding utf8) {
+        if ($line -match '^name:\s*(.+?)\s*$') { $name = $Matches[1]; break }
+    }
+    $name = $name.Trim('"').Trim("'")
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        Write-Warning "knowledge/SKILL.md has no 'name:' field; installing it as 'knowledge'."
+        $name = 'knowledge'
+    }
+    $skillDirs += [pscustomobject]@{ Path = $knowledgeDir; Name = $name }
+}
 
 if ($skillDirs.Count -eq 0) {
-    Write-Warning "No skills found: nothing under $repoRoot\methods or $repoRoot\knowledge has a SKILL.md."
+    Write-Warning "No skills found: no methods/*/SKILL.md and no knowledge/SKILL.md under $repoRoot."
     exit 1
 }
 
@@ -99,7 +116,7 @@ $skipped = @()
 
 foreach ($dir in $skillDirs) {
     $name = $dir.Name
-    $src = $dir.FullName
+    $src = $dir.Path
     $target = Join-Path $destFull $name
     $action = 'copy'
 

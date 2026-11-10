@@ -170,3 +170,40 @@ Defence: aggregate. Store the per-site spectra in one array per structure (or pe
 structures). `feff.inp` is a pure function of (geometry, cards), and the cards plus the generator's
 version can be recorded alongside the data, so full reproducibility does not require keeping the
 files.
+
+## 13. An element table that stops at Kr kills every iodine/tellurium molecule
+
+`make_input.py` writes the whole retained cluster into `ATOMS` and needs a Z for each species, but
+the absorbing-element list is what usually gets checked. A table that ends at Kr returns
+`KeyError: 'Z53'` for iodine at render time — the traceback lands in the worker's stderr, the site is
+scored as a FEFF failure, retried to exhaustion, and then quietly aggregated as NaN. In a real
+dataset this hit 376 structures and 10,198 sites (0.9%), and was only noticed because the last 1%
+of the batch would not finish.
+
+Defence: before submitting, take the union of all atomic numbers in the input and assert every one
+of them is in the Z table. Better still, have the renderer fail with a message that names the
+species and the file, not a bare `KeyError`.
+
+## 14. "Valid only if every point is finite" throws away good spectra
+
+Missing points below the FEFF grid start are part of the agreed output convention (pitfall 3), and
+their count depends on the edge energy: at a 275–315 eV window on the C K edge a single missed
+point disqualifies the spectrum, while O K at 528 eV rarely loses any. A collector that used
+`np.isfinite(mu).all()` therefore kept only 21% of the C sites, 48% of N and 94% of O, and reported
+79% of a million-site dataset as missing — with a per-element gradient as the only clue.
+
+Defence: require a *minimum* number of finite points (a few percent of the grid is plenty), record
+the per-spectrum finite count, and when summing sites across an element use the per-point mask so a
+point that is NaN in every site stays NaN rather than collapsing to 0 through `nansum`.
+
+## 15. A completion cache is not an authority on completeness
+
+Self-regulating submitters keep a "which structures are finished" cache so they do not rescan a
+million site directories each round. When a bug fix invalidates previously-failed sites, that cache
+still marks their structures complete, the submitter reports "nothing left to submit" and exits, and
+the run looks finished at 98.9%.
+
+Defence: keep the cache as an optimisation only. Reconcile against a fresh, threaded `stat` pass over
+the planned site list, print the exact gap, and make the final "is it done" decision from that scan
+rather than from the cache or from a completed-file counter that can never reach the planned total
+(failed sites have no output file, so `done == total` is the wrong test to begin with).

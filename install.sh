@@ -2,9 +2,10 @@
 #
 # Install the CompChemKit skills into an agent's skills directory.
 #
-# Every methods/<skill>/ and knowledge/<skill>/ folder that contains a SKILL.md is installed
-# into the destination directory (default: ~/.dsh/skills). The default action is a copy;
-# --link uses a symlink and falls back to a copy if symlinks are unavailable.
+# Every methods/<skill>/ folder that contains a SKILL.md is installed into the destination
+# directory (default: ~/.dsh/skills), plus the knowledge/ knowledge base as one skill named by
+# the `name:` field of knowledge/SKILL.md. The default action is a copy; --link uses a symlink
+# and falls back to a copy if symlinks are unavailable.
 #
 # An existing skill directory in the destination is never deleted implicitly:
 #   * without --force it is skipped with a warning;
@@ -29,7 +30,8 @@ Usage: ./install.sh [options]
   --force      Allow replacing an existing skill directory (asks for confirmation)
   -h, --help   Show this help
 
-Every methods/<skill>/ and knowledge/<skill>/ folder containing a SKILL.md is installed.
+Every methods/<skill>/ folder containing a SKILL.md is installed, plus the knowledge/ knowledge
+base as one skill (named by the `name:` field of knowledge/SKILL.md).
 EOF
 }
 
@@ -60,19 +62,32 @@ if [ -z "$DEST" ]; then
 fi
 
 # ---- discover skills -------------------------------------------------------
+# methods/<skill>/ is one skill per folder (folder name = skill name). knowledge/ is a single
+# knowledge-base skill: its folder name is fixed ("knowledge"), so its skill name comes from the
+# `name:` field of its SKILL.md.
 shopt -s nullglob
-skills=()
-for group in methods knowledge; do
-    for dir in "$REPO_ROOT/$group"/*/; do
-        if [ -f "${dir}SKILL.md" ]; then
-            skills+=("${dir%/}")
-        fi
-    done
+skill_dirs=()
+skill_names=()
+for dir in "$REPO_ROOT"/methods/*/; do
+    if [ -f "${dir}SKILL.md" ]; then
+        skill_dirs+=("${dir%/}")
+        skill_names+=("$(basename "${dir%/}")")
+    fi
 done
+if [ -f "$REPO_ROOT/knowledge/SKILL.md" ]; then
+    knowledge_name="$(sed -n 's/^name:[[:space:]]*//p' "$REPO_ROOT/knowledge/SKILL.md" \
+        | head -n 1 | tr -d '\r' | sed 's/[[:space:]]*$//')"
+    if [ -z "$knowledge_name" ]; then
+        echo "warning: knowledge/SKILL.md has no 'name:' field; installing it as 'knowledge'." >&2
+        knowledge_name="knowledge"
+    fi
+    skill_dirs+=("$REPO_ROOT/knowledge")
+    skill_names+=("$knowledge_name")
+fi
 shopt -u nullglob
 
-if [ "${#skills[@]}" -eq 0 ]; then
-    echo "install.sh: no skills found (no methods/*/SKILL.md or knowledge/*/SKILL.md)" >&2
+if [ "${#skill_dirs[@]}" -eq 0 ]; then
+    echo "install.sh: no skills found (no methods/*/SKILL.md and no knowledge/SKILL.md)" >&2
     exit 1
 fi
 
@@ -93,8 +108,9 @@ skipped=0
 printf '%-26s %-10s %s\n' "SKILL" "ACTION" "DESTINATION"
 printf '%-26s %-10s %s\n' "--------------------------" "----------" "---------------------------------"
 
-for src in "${skills[@]}"; do
-    name="$(basename "$src")"
+for index in "${!skill_dirs[@]}"; do
+    src="${skill_dirs[$index]}"
+    name="${skill_names[$index]}"
     target="$DEST/$name"
 
     if [ -e "$target" ] || [ -L "$target" ]; then

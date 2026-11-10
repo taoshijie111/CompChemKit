@@ -17,17 +17,21 @@ number, and which step costs the disk.
 | Folder | Holds | Test |
 |---|---|---|
 | `methods/` | **How to compute something**: software usage, HPC connection and job submission, concrete calculation workflows end to end. | Following it means running commands / editing scripts / submitting jobs. |
-| `knowledge/` | **Distilled knowledge and experience**: what was learned from the literature, from benchmarks, or from practice — which method for which property, common pitfalls, convergence tables, how to read a class of spectra. | Following it means *deciding* something, not running a workflow. |
+| `knowledge/` | **What is worth knowing before you compute**: literature- and benchmark-derived conclusions on method choice, accuracy, pitfalls and interpretation, organised as one note per source (paper, review, blog, docs, talk) and indexed by topic. | Following it means *deciding* something, not running a workflow. |
 
 A rule is "runnable" → `methods/`. A rule is "conclusions and evidence" → `knowledge/`. See
-[`knowledge/README.md`](knowledge/README.md) for the knowledge-skill contract.
+[`knowledge/README.md`](knowledge/README.md) for the knowledge-base contract and the note index.
 
 ```
 CompChemKit/
 ├── methods/
 │   └── <skill-name>/        SKILL.md + scripts, templates, reference data
 ├── knowledge/
-│   └── <skill-name>/        SKILL.md + notes/, references/, data/
+│   ├── SKILL.md             agent entry point; installed as the single skill compchem-knowledge
+│   ├── README.md            topic taxonomy + generated index of every note
+│   ├── _template.md         template for a new note
+│   ├── tools/               build_index.py: validates notes, regenerates the README index
+│   └── <topic>/             one .md per source, e.g. electronic-structure/2024-doe-....md
 ├── install.sh               installer (Linux / macOS / WSL / Git Bash)
 ├── install.ps1              installer (Windows PowerShell)
 ├── LICENSE                  MIT
@@ -41,10 +45,13 @@ CompChemKit/
 | `hpc-cluster` | [`methods/hpc-cluster/`](methods/hpc-cluster/) | Connect to any SSH HPC cluster: passwordless SSH bootstrap, partition/QOS/core-count choice, Slurm submit/monitor/cancel, file transfer with MD5 verification, and a local watchdog that wakes the agent when a job of a long multi-stage batch ends. Cluster addresses, accounts, scheduler names and software paths are kept in a local config file (`~/.compchemkit/config.json`), and per-cluster gotchas live in `platforms/<name>.md`. | SSH access to a Slurm/PBS cluster, Python 3.9+ with `paramiko` (fallback transport), PowerShell 7 for the watchdog |
 | `amoeba-stark-tuning` | [`methods/amoeba-stark-tuning/`](methods/amoeba-stark-tuning/) | Vibrational Stark tuning rate and local probe-bond field from Tinker/AMOEBA MD: field from the induced-dipole difference (production minus gas-phase reference), per-solvent extraction, regression against your measured frequencies, publication-style plot. Ships a validated benzaldehyde / 7-solvent case study. | Tinker CPU binaries (`minimize`, `dynamic`, `analyze`, v25/v26), Poltype2 + xTB, Packmol, Open Babel, Python (numpy, matplotlib), **your own experimental IR frequencies**, ~33 GB disk per production replicate |
 | `xtb-ir-pipeline` | [`methods/xtb-ir-pipeline/`](methods/xtb-ir-pipeline/) | Batch IR spectra from a SMILES list: Open Babel conformers → GFN2-xTB `--ohess` opt+freq → imaginary-frequency cleanup → Voigt/Lorentzian broadening into an HDF5 database, plus re-broadening and de-duplication. Ships SLURM array-job scripts. | `xtb` with `--ohess`, Open Babel with Python bindings, Python ≥ 3.9 (numpy, h5py, tqdm; numba strongly recommended), Slurm |
+| `compchem-knowledge` | [`knowledge/`](knowledge/) | A growing, literature-grounded knowledge base: one Markdown note per source, filed by topic (electronic structure, thermochemistry, solvation, spectroscopy, dynamics/force fields, ML/automation, analysis/benchmarks) and indexed in [`knowledge/README.md`](knowledge/README.md). Each note states the method choice, expected accuracy, failure modes and practical rules, tied to its source. | Nothing to run — Markdown notes with relative links; adding notes needs Python 3.9+ for `knowledge/tools/build_index.py` |
 
-The table grows as skills are added. You do not have to edit the installers to add one: any
-`methods/<name>/` or `knowledge/<name>/` folder that contains a `SKILL.md` is picked up
-automatically.
+The table grows as skills are added. You do not have to edit the installers to add one: every
+`methods/<name>/` folder with a `SKILL.md` is picked up automatically, and the whole `knowledge/`
+base is installed as the single `compchem-knowledge` skill (adding a note never requires an
+installer change; re-run the installer with `--force` / `-Force`, or install with `--link` /
+`-Link` once to keep the installed copy in sync).
 
 ## Install
 
@@ -110,10 +117,15 @@ commit.
 
 ## Contributing
 
-A skill is a folder plus a `SKILL.md` whose frontmatter has `name` (equal to the folder name) and
-`description` (starting with the trigger "Use when …"). Put runnable workflows in `methods/`,
-distilled knowledge in `knowledge/`. Keep the text UTF-8 with LF line endings, use placeholders
-for anything site-specific, and test what you ship.
+A `methods/` skill is a folder plus a `SKILL.md` whose frontmatter has `name` (equal to the folder
+name) and `description` (starting with the trigger "Use when …"). Put runnable workflows there.
+
+`knowledge/` is one knowledge base, not a skill per topic: one source becomes one Markdown note
+under `knowledge/<topic>/`, following the contract in
+[`knowledge/README.md`](knowledge/README.md#note-contract). After adding or editing a note, run
+`python knowledge/tools/build_index.py --write`; the check
+(`python knowledge/tools/build_index.py`) must exit 0 before a commit. Keep the text UTF-8 with LF
+line endings, use placeholders for anything site-specific, and test what you ship.
 
 ## License
 

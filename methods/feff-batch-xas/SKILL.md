@@ -95,7 +95,7 @@ Read `references/pitfalls.md` before scaling up. The three that cost the most ti
 3. Fixed energy windows can start below the first energy FEFF actually computed. Shift the window
    or mark those points missing — never zero-fill, or every spectrum gets a fake leading edge.
 
-Two more that only appear once the clusters are truncated (i.e. when the molecule is bigger than the
+Four more that only appear once the clusters are truncated (i.e. when the molecule is bigger than the
 cluster radius — routine for large molecules, and invisible on small test systems):
 
 4. **Every potential must have a representative atom inside the FMS sphere.** If `ATOMS` is
@@ -105,6 +105,18 @@ cluster radius — routine for large molecules, and invisible on small test syst
 5. **Modules can stop and still exit 0** (Fortran `STOP` under gfortran). A `pot` failure this way
    surfaces one module later as a confusing `screen`/`xsph` crash. Treat a lone `STOP` line in a
    module's stderr as a failure.
+6. **Your element table must cover every element in the input structures, not just the absorbers.**
+   The renderer writes the whole cluster into `ATOMS` and needs a Z for each species. A table that
+   stops at Kr turns every iodine/ tellurium-containing molecule into `KeyError: 'Z53'` at render
+   time — which looks exactly like a FEFF failure and gets retried to exhaustion (1% of a real
+   dataset, once). Validate the table against the union of all Z present before submitting.
+7. **A "spectrum is valid only if every point is finite" test silently discards good data.** Missing
+   points below the FEFF grid start are part of the agreed output convention (pitfall 3), and how
+   many there are depends on the edge energy — C K suffers far more than O K. Requiring
+   `np.isfinite().all()` threw away 79% of a million-site dataset in one pass, and the per-element
+   effective-site counts (C 21% / N 48% / O 94%) were the only visible symptom. Test for a
+   *minimum number* of finite points, and when summing sites use the per-point mask so that a point
+   that is NaN at every site stays NaN instead of collapsing to 0 via `nansum`.
 
 ## Scaling out
 
@@ -112,7 +124,7 @@ Sites are independent, so the batch shape matters more than any single-site tuni
 site (or per structure) with a short wall time and a self-regulating submitter beats one large,
 long job array by a wide margin. The general reasoning — why arrays do not equal concurrency, why
 the concurrency cap is counted in jobs rather than cores, and why backfill only takes short jobs —
-is in the sibling skill `methods/hpc-cluster` (§3.6). Two consequences specific to XAS batches:
+is in the sibling skill `methods/hpc-cluster` (§3.6). Three consequences specific to XAS batches:
 
 - The natural independent unit is the **(structure, absorbing atom)** pair, not the structure: a
   molecule with 200 absorbers spread over one job turns it into a multi-hour unit that is expensive
@@ -120,6 +132,11 @@ is in the sibling skill `methods/hpc-cluster` (§3.6). Two consequences specific
 - At 10^6 sites the per-site three-piece set (`feff.inp`, `xmu.dat`, `spectrum.csv`) is millions of
   files. Keep the spectra in aggregate arrays keyed by structure and retain the three-piece set for
   a small sample only, so the inputs stay auditable without drowning networked storage.
+- **A submitter that remembers "which molecules are done" will eventually remember wrong.** When a
+  bug invalidates previously-failed sites, the completion cache keeps skipping them and the run
+  looks finished at 98.9% with a submitter that reports "nothing left to submit". Reconcile the
+  finish line against a fresh filesystem scan (one `stat` per planned site, threaded) and print the
+  gap explicitly; never let a cache be the only authority on completeness.
 
 ## Files
 

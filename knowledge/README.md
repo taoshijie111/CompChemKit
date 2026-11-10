@@ -1,82 +1,157 @@
-# `knowledge/` — distilled knowledge, not runnable workflows
+# `knowledge/` — literature-grounded knowledge base
 
-Everything in `methods/` answers *how to run a calculation*: which software, which flags, how to
-get it onto a cluster. `knowledge/` answers the other half of the question: **what did we learn
-that should change the calculation you are about to run?**
+`methods/` answers **how to run a calculation**. This folder answers the other half:
+**what is worth knowing before you run it** — which method to choose for a property, what accuracy
+to expect, what silently goes wrong, and how to read the number that comes out.
 
-A knowledge skill collects literature-derived, benchmark-derived or hard-won practical experience
-and states it as reusable conclusions. It is *not* a runnable workflow — if following your skill
-means editing a script and submitting a job, it belongs in `methods/`, not here.
+It is a *knowledge base*, not one skill per topic. **One source → one Markdown note**: a paper,
+review, preprint, blog post, documentation page, talk or dataset becomes exactly one file, filed
+under its primary topic and indexed below. Notes are distilled to decisions, not summaries; every
+claim keeps its source and its limits attached.
 
-## What belongs here
+## How to use it
 
-- **Method/property guidance** — "which functional and basis set for which property", which
-  solvation model for which observable, which reference level is good enough for a benchmark.
-- **Pitfalls of a method** — failure modes, silent errors, convergence traps, unit/convention
-  traps, "this looks converged but is not".
-- **Benchmark and convergence tables** — MAE/MAD tables from the literature or from your own runs,
-  convergence criteria per property or per code, basis-set-limit ladders.
-- **Interpretation guides** — how to read a class of spectra, how to tell a real signal from an
-  artifact, what a small imaginary frequency usually means.
-- **Rules of thumb with provenance** — short, checkable statements plus the paper, benchmark or
-  dataset they came from.
+**As an agent.** The whole folder is installed as the single skill `compchem-knowledge`. Load its
+[`SKILL.md`](SKILL.md), open the index below, and read *only* the note that matches the decision at
+hand. A note is a map, not the territory: check `confidence`, `scope` and *Limits and failure
+modes* before relying on a number, and cite the note path **and** the primary source in anything you
+publish.
 
-What does **not** belong here:
+**As a human.** Browse the topics, then the index; every note is one screen of reading. Tags live
+in the frontmatter, so `grep -r "dispersion" .` finds every note that mentions the topic.
 
-- Step-by-step runnable procedures → `methods/`.
-- Large raw datasets or binaries (download links are fine, blobs are not).
-- Unattributed personal opinion. State the evidence and the confidence; a "rule" without a source
-  is a rumour.
-- Anything site-specific (hostnames, accounts, cluster paths) — placeholders only.
+## Topics
 
-## Required `SKILL.md` frontmatter
+Every note lives in exactly one topic directory. Directories are created when their first note
+lands — the table below is the intended taxonomy, not an empty skeleton. If a note genuinely spans
+two topics, file it under its **primary** topic and cross-link the other with a relative link plus
+an entry in `related:`; never duplicate a note.
 
-```yaml
----
-name: short-kebab-case-name
-description: Use when <trigger> — <what knowledge this gives and what it lets the agent decide>.
----
+| Topic | What belongs there | Closest `methods/` skill |
+| --- | --- | --- |
+| `electronic-structure/` | DFT functionals and basis sets, dispersion corrections, wavefunction methods (MP2, CC, CASSCF), excited states (TDDFT, EOM-CC), multireference, SCF and integration-grid numerics, method-selection and accuracy studies. | — |
+| `thermochemistry-and-kinetics/` | Optimisation and frequencies, partition functions and thermochemical corrections, conformer ensembles, transition states and barriers, rate theories, error propagation into ΔG and ΔG‡. | — |
+| `solvation-and-environment/` | Continuum solvation (PCM, SMD, COSMO-RS), explicit solvent and cluster models, QM/MM embedding, environment effects on structure, spectra and energetics. | — |
+| `spectroscopy/` | IR/Raman/VCD, NMR shifts and couplings, UV-Vis/ECD, X-ray (XAS/XPS): simulation protocols, broadening, scaling, and how to tell signal from artefact. | `xtb-ir-pipeline`, `amoeba-stark-tuning` |
+| `dynamics-and-force-fields/` | Classical and polarisable force fields (e.g. AMOEBA), MD sampling and convergence, enhanced sampling, free-energy estimation. | `amoeba-stark-tuning` |
+| `ml-and-automation/` | Machine-learned potentials, Δ-learning, datasets and uncertainty, automated workflows and agent tooling for computational chemistry. | `hpc-cluster` |
+| `analysis-and-benchmarks/` | Wavefunction and bonding analysis (NBO, QTAIM, EDA, SAPT), benchmark design, error statistics, uncertainty quantification, how to judge a method claim. | — |
+
+Software- or code-specific behaviour belongs to the topic it affects (a grid-size trap in an
+integration grid goes to `electronic-structure/`, not to a "software" topic).
+
+## Index
+
+<!-- BEGIN:INDEX -->
+_1 note(s) across 1 topic(s). Generated by `tools/build_index.py`; do not edit by hand._
+
+| Note | Topic | Source | Type | Added | Confidence | Takeaway |
+| --- | --- | --- | --- | --- | --- | --- |
+| [Best DFT model chemistries for S0, S1 and T1 redox potentials of organic photoredox catalysts](electronic-structure/2025-gomes-dft-redox-benchmark.md) | electronic-structure | Gomes L. A. et al., J. Phys. Chem. A, 2025 | paper | 2026-10-28 | medium | 147 DFT/TD-DFT model chemistries vs experiment on 9 organic photoredox catalysts: PBE0-D3BJ and N12-SX/6-311+G(d,p) for S1 redox (MAE 0.16/0.08 eV), ωB97X and BHandH/6-311+G(d,p) for T1 redox (0.10/0.24 eV). |
+<!-- END:INDEX -->
+
+The index is generated from the notes' frontmatter by [`tools/build_index.py`](tools/build_index.py).
+Do not edit between the `BEGIN:INDEX` / `END:INDEX` comments by hand: add the note, run
+`python tools/build_index.py --write`, and the table (title, topic, source, type, date, confidence,
+one-line takeaway) updates itself.
+
+## Note contract
+
+### Location and filename
+
+`<topic>/<YYYY>-<slug>.md` — `<YYYY>` is the publication year (for a blog, the post year) and
+`<slug>` is short kebab-case ASCII, typically the first author plus the concept, 2–5 words:
+
+```
+electronic-structure/2024-doe-dispersion-benchmark.md
+spectroscopy/2025-roe-ir-scaling-factors.md
 ```
 
-- **`name`** — kebab-case and identical to the folder name (*required*).
-- **`description`** — the only text an agent sees before deciding to load the skill (*required*).
-  Start with the trigger ("Use when …"), then say what the skill provides. If the knowledge is
-  narrow, say where it does *not* apply; an over-broad description makes the skill fire on
-  unrelated tasks.
-- No other keys are required. Keep the body focused: front-load the conclusions, then the
-  evidence and the references.
+The year in the filename must equal `year:` in the frontmatter, and the directory must equal
+`category:`. Notes live exactly one directory below `knowledge/`.
 
-## Recommended layout
+### Frontmatter
 
-```
-knowledge/<skill-name>/
-├── SKILL.md          # frontmatter + the distilled conclusions (the "answer" goes first)
-├── notes/            # derivations, per-paper notes, reasoning, worked examples
-├── references/       # citation list / BibTeX / DOI list backing every claim
-└── data/             # small CSV tables the notes refer to (no large binaries)
-```
+Flat YAML only, no nesting — the index tool parses a deliberately small subset: `key: value`,
+double-quoted strings, and inline lists like `[a, b]`. Fields:
 
-Only `SKILL.md` is mandatory; add `notes/`, `references/` and `data/` when they carry real
-content. Keep tables in `data/` machine-readable (CSV/TSV) and cite the source of each one in
-`references/`.
+| Field | Required | Values / meaning |
+| --- | --- | --- |
+| `title` | yes | Declarative one line — the decision the note supports. ≤ 140 characters. |
+| `category` | yes | The topic directory, exactly (`electronic-structure`, …). |
+| `type` | yes | `paper`, `review`, `preprint`, `blog`, `docs`, `talk`, `dataset`, `book`, `thesis`. |
+| `authors` | no | `"Doe J.; Roe R."` — semicolon-separated, natural order. Omit for site-authored blogs. |
+| `year` | yes | Publication year, four digits. |
+| `venue` | no | Journal, blog, repository or conference short name. |
+| `doi` | one of doi/url | Bare DOI, e.g. `10.1021/acs.jctc.4c00000`. |
+| `url` | one of doi/url | Stable link; use the DOI URL when there is a DOI. |
+| `added` | yes | ISO date the note was written (`YYYY-MM-DD`). |
+| `read` | yes | `skim`, `read`, `deep` — how carefully the source was read; sets the ceiling on confidence. |
+| `confidence` | yes | `high`, `medium`, `low` — see *Quality bar*. |
+| `summary` | yes | One sentence with the actionable claim, used verbatim in the index. ≤ 200 characters is good. |
+| `tags` | no | Lower-case kebab tags, inline list: `[dft, dispersion, benchmark]`. |
+| `scope` | no | Systems, properties and levels of theory the conclusions apply to. |
+| `related` | no | Other notes, paths relative to `knowledge/`, e.g. `[spectroscopy/2025-roe-ir-scaling.md]`. |
 
-## Status
+### Body
 
-`knowledge/` is currently **empty**: this README is a placeholder and the only file here. No
-knowledge skills have landed yet — the maintainer will add the first ones, following the contract
-above. Until then, `install.sh` / `install.ps1` install nothing from this folder, because a skill
-is only picked up when its folder contains a `SKILL.md`.
+The body is for the reader who has already opened the note. Front-load the conclusions, keep the
+evidence attached, and end with what to do differently. Section headings are shared across notes so
+the same information is always in the same place:
 
-## How to contribute one
+1. `## Bottom line` — 3–5 bullets, each an actionable claim. No background first.
+2. `## Context` — the problem the source addresses, and why it was worth noting.
+3. `## Method essentials` — theory, settings and conventions needed to apply the result; equations
+   only where they change a decision, code/version where a number depends on it.
+4. `## Key results` — numbers with units and the conditions they were obtained under; point to the
+   source's tables and figures instead of copying them.
+5. `## Limits and failure modes` — where it stops being true, what was not tested, what a silent
+   error would look like.
+6. `## Practical rules` — if/then rules for my own calculations: defaults, sanity checks, reference
+   values to compare against.
+7. `## Connections` — relative links to other notes and to the `methods/` skills that implement the
+   workflow.
+8. `## References` — the source plus anything cited inside the note, with clickable DOIs/URLs.
 
-1. Create `knowledge/<skill-name>/` with the folder name equal to the skill `name`.
-2. Write `SKILL.md`: frontmatter (`name`, `description`) plus a body whose first section is the
-   conclusions, not the introduction.
-3. One claim per bullet, each traceable to a source in `references/`; mark your own experience as
-   such and say on how many systems it was observed.
-4. Put numbers in tables under `data/` (CSV) and version-stamp them — "B3LYP/def2-TZVP, xtb 6.6.1" —
-   so the table stays meaningful years later.
-5. Check for personal or institutional identifiers: use `hpc.example.edu`, `your_username`,
-   `/path/to/project` — never a real host, account or home path.
-6. Keep all text UTF-8 with LF line endings.
-7. Run `./install.sh` (or `.\install.ps1`) and confirm the new skill appears in the table.
+`## Source notes` (optional) holds short quotations with locators (page, figure, table). Quote
+sparingly, keep it to a few lines, and never paste a page of text.
+
+## Adding a note
+
+1. Pick the topic. If no directory fits, create one and add a row to the *Topics* table above —
+   the taxonomy is a contract, not an accident.
+2. `cp _template.md <topic>/<YYYY>-<slug>.md`.
+3. Fill the frontmatter and the body; conclusions first, source and limits attached.
+4. Run `python tools/build_index.py --write` — it validates every note and regenerates the index.
+5. Review `git diff` (note + README together) and commit.
+
+The check is also the pre-commit gate: `python tools/build_index.py` exits non-zero when a note is
+malformed, a `related:` link is missing, a DOI is duplicated, or the index is out of date.
+
+## Quality bar
+
+- **Provenance.** Every claim is traceable to the source or is explicitly labelled as my own
+  inference, measurement or experience. No unattributed rules of thumb.
+- **Numbers carry conditions.** Value, unit, method, code/version and the system it was obtained
+  on. No unit or convention mixing (a.u. vs eV, cm⁻¹ vs Eh, Debye vs a.u.) without stating the
+  conversion.
+- **Confidence.** `high` = several independent studies or reproduced by me; `medium` = one careful
+  study on limited systems, consistent with nearby literature; `low` = single paper or preprint,
+  extrapolated, or read only partially. When in doubt, mark it lower and say why.
+- **Separate claim from inference.** The note may add "what this means for my systems", but that
+  part must be flagged as mine, not the authors'.
+- **Copyright.** Paraphrase. Short quotations with locators only. Link to figures and tables; do
+  not paste them. Never commit a paywalled PDF — a DOI is enough.
+
+## Maintenance
+
+- The index is generated; never edit it by hand. `python tools/build_index.py` must exit 0 before
+  a commit.
+- Adding a note does not require an installer change: the whole `knowledge/` folder is one skill.
+  If it was installed by copy, re-run the installer with `--force` / `-Force` (it asks before
+  replacing); install with `--link` / `-Link` once to keep the installed copy pointing here.
+- When a topic stops being one coherent mental shelf (roughly more than 15–20 notes, or two clearly
+  separate sub-fields), split it: move the notes, update `category:`, add the new topic row above,
+  and regenerate the index.
+- Renaming or moving a note: fix its `category`/`related:` references and anything that links to it;
+  the index follows automatically.
